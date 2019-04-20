@@ -1,4 +1,6 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 import hashlib
 from printcolor_lingling import print_testresult
 
