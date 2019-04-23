@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# !/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 from PIL import Image, ImageFilter
 import os
 import shutil
