@@ -60,7 +60,17 @@ class MySQLTool(object):
                 self.cursor.execute(sql[0])
             else:
                 self.cursor.execute(*sql)
-        return self.cursor.fetchall()
+        error = False
+        try:
+            # 这里如果报错，说明操作是比如 create table 之类的操作，返回 None
+            result = self.cursor.fetchall()
+        except BaseException:
+            error = True
+        finally:
+            if error:
+                return None
+            else:
+                return result
 
     # 返回 cursor
     def get_cursor(self):
@@ -91,7 +101,6 @@ if __name__ == '__main__':
         # 测试数据
         user = 'docker'
         pw = '1654879wddgfg'
-        # ip = '172.17.0.2'
         database = 'docker_test_database'
 
         # ---- 测试代码2 ----
