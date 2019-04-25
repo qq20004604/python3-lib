@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from mysql import connector
+from printcolor_lingling import print_testresult
 
 _user = ''
 _password = ''
@@ -82,31 +83,42 @@ class MySQLTool(object):
 
 
 # 测试代码和示例代码
+# 以下代码的执行前提是本机有一个 mysql 的容器，这个容器参照这个链接
+# https://github.com/qq20004604/docker-learning/tree/master/docker-demo-02-MySQL
 if __name__ == '__main__':
-    # 测试数据
-    user = 'docker'
-    pw = '1654879wddgfg'
-    # ip = '172.17.0.2'
-    database = 'docker_test_database'
+    is_error = False
+    try:
+        # 测试数据
+        user = 'docker'
+        pw = '1654879wddgfg'
+        # ip = '172.17.0.2'
+        database = 'docker_test_database'
 
-    # ---- 测试代码2 ----
-    with MySQLTool(user=user, password=pw, database=database) as m2:
-        result2 = m2.run_sql([
-            ['insert person(name, age) values ("李四", 20), ("王五", 30)'],
+        # ---- 测试代码2 ----
+        # 连接数据库
+        with MySQLTool(user=user, password=pw, database=database) as m2:
+            # 执行sql并获得返回结果
+            result2 = m2.run_sql([
+                ['insert person(name, age) values ("李四", 20), ("王五", 30)'],
+                ['select * from person']
+            ])
+            # 打印结果
+            print(result2)
+
+        # ---- 测试代码1 ----
+        m = MySQLTool()
+        # 查看mysql容器内 ip，参考这个链接：https://blog.csdn.net/CSDN_duomaomao/article/details/75638544
+        m.connect(user=user,
+                  password=pw,
+                  # host=ip,
+                  database=database)
+        result = m.run_sql([
+            ['insert person(name,age) values (%s, %s)', ['六六六', 666]],
             ['select * from person']
         ])
-        print(result2)
+        print(result)
+        m.close()
+    except BaseException as e:
+        is_error = True
 
-    # ---- 测试代码1 ----
-    m = MySQLTool()
-    # 查看mysql容器内 ip，参考这个链接：https://blog.csdn.net/CSDN_duomaomao/article/details/75638544
-    m.connect(user=user,
-              password=pw,
-              # host=ip,
-              database=database)
-    result = m.run_sql([
-        ['insert person(name,age) values ("李四", 20)'],
-        ['select * from person']
-    ])
-    print(result)
-    m.close()
+    print_testresult(~is_error, 'MySQLTool')
