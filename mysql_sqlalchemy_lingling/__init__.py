@@ -4,7 +4,7 @@
 # 一些复杂用法参照 https://zhuanlan.zhihu.com/p/27400862
 
 # 导入:
-from sqlalchemy import Column, INT, String, create_engine, MetaData
+from sqlalchemy import Column, INT, String, create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -45,6 +45,7 @@ class SQLAlchemyTool(object):
 		s = '{sql}+{drive}://{user}:{pw}@{host}:{port}/{database}'
 		s = s.format(sql=sql, drive=drive, user=user, pw=password, host=host, port=str(port), database=database)
 		_engine = create_engine(s)
+		self._engine = _engine
 		db_session = sessionmaker(bind=_engine)
 		self.session = db_session()
 
@@ -103,13 +104,12 @@ class SQLAlchemyTool(object):
 	def update_by_primary_key(self, class_prototype, result_dict, *filters):
 		self.session.query(class_prototype).filter(*filters).update(result_dict)
 
-# --------------------------------------
-# 创建表格测试
-# def create_table(self, class_prototype):
-# 	self.session.
-
-
-# 指定表里内容全删除
+	# --------------------------------------
+	# 创建表格测试
+	def run_sql(self, sql, *multiparams):
+		# 加上 text() 可以防 sql 注入
+		# 如果有返回值，可以通过 返回值.fetchall() 来获取值，是一个 tuple
+		return self._engine.execute(text(sql), *multiparams)
 
 
 if __name__ == '__main__':
@@ -204,24 +204,51 @@ if __name__ == '__main__':
 		show_all(t)
 
 
-	class TableCreateTest:
+	class TableCreateTest(Base):
 		# 表的名字:
-		__tablename__ = 'create_test'
+		__tablename__ = 'create_test3'
 
 		# 表的结构:
 		# autoincrement=True 表示主键自增
 		# primary_key=True 表示是主键
 		id = Column(INT(), autoincrement=True, primary_key=True)
-		name = Column(String(255))
+		first_name = Column(String(255))
+		last_name = Column(String(255))
+		# name = Column(String(255))
+		age = Column(INT())
+
+
+	def show_all_test3(t):
+		r = t.query_all(TableCreateTest)
+		print('_______显示当前全部_______')
+		print("id,  first_name, last_name,   age")
+		for i in r:
+			print(i.id, i.first_name, i.last_name, i.age)
+		print('_______显示结束_______')
+		print('')
 
 
 	# 7# 测试代码，create table
-	# with SQLAlchemyTool(user='docker', password='1654879wddgfg', database='docker_test_database') as t:
-	#
-	# 	show_all(t)
+	with SQLAlchemyTool(user='docker', password='1654879wddgfg', database='docker_test_database') as t:
+		t.run_sql(
+			'UPDATE create_test3 set first_name = :firstname where age = 20',
+			{
+				'firstname': 'aaaaaa'
+			}
+		)
+		show_all_test3(t)
 
-# 创建Query查询，filter是where条件，最后调用one()返回唯一行，如果调用all()则返回所有行:
-# user = session.query(User).all()[0]
-# # 打印类型和对象的name属性:
-# print('type:', type(user))
-# print('id: %s, name: %s, age: %s' % (user.id, user.name, user.age))
+		t.run_sql(
+			'UPDATE create_test3 set first_name = :firstname where age = 20',
+			{
+				'firstname': 'fi'
+			}
+		)
+		r2 = t.run_sql(
+			'select * from create_test3 where age = :age',
+			{
+				'age': '20'
+			}
+		)
+
+		print(r2.fetchall())
