@@ -1,5 +1,11 @@
 # 说明
 
+安装：
+
+```bash
+pip install mysql-connector
+```
+
 ## 1、作用
 
 ``mysql`` 模块的再包装，并支持 with语法。
