@@ -63,12 +63,19 @@ class KeyValueGetter(object):
     # 从redis请求
     def query_redis(self):
         nowtime = datetime.now().timestamp() * 1000
+        # 以下 key 将被从 Redis 里更新
         redis_keys = []
+        # 以下 key 将被从 MySQL 取出
+        mysql_keys = []
         for key in self.kv_pool:
             # 当前时间和上一次更新时间 大于 过期时间
             if nowtime - self.kv_pool[key]['update_time'] > self.kv_pool[key]['expire_time']:
                 # 那么将key添加待更新list里
                 redis_keys.append(key)
+        # 如果没找到需要更新的，则返回
         if len(redis_keys) == 0:
             return
+        # 连接redis服务器
         r = redis.Redis(**self._redis_args)
+        for key in redis_keys:
+            value = r.get(key)
