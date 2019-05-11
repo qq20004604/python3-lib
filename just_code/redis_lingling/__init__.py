@@ -5,12 +5,12 @@ from datetime import datetime
 # redis默认port（端口）是6379
 # decode_responses=True，写入的键值对中的value为str类型，不加这个参数写入的则为字节类型
 # password 需要密码。非同机访问，需要填写密码才可以访问
-r = redis.Redis(host='192.168.0.104', port=6379, decode_responses=True, password='fsdfwef32r23r32vsdvvavsfdvsf12e21fav')
-# key是"foo" value是"bar" 将键值对存入redis缓存
-r.set('foo', 'is foo')
-# 取出键foo对应的值，这两种方式都可以
-print(r['foo'])
-print(r.get('foo'))
+# r = redis.Redis(host='119.3.214.234', port=6378, decode_responses=True, password='fewfwevfvdfsverimogmrioi23m32fwef')
+# # key是"foo" value是"bar" 将键值对存入redis缓存
+# r.set('foo', 'is foo')
+# # 取出键foo对应的值，这两种方式都可以
+# print(r['foo'])
+# print(r.get('foo'))
 
 """
 KeyValueGetter: key-value获取控制器
@@ -34,7 +34,7 @@ class KeyValueGetter(object):
     # port=6379,
     # decode_responses=True,
     # password=''
-    def __int__(self, redis_args, mysql_args):
+    def __init__(self, redis_args, mysql_args):
         self._redis_args = redis_args
         self._mysql_args = mysql_args
         self.kv_pool = {}
@@ -79,3 +79,28 @@ class KeyValueGetter(object):
         r = redis.Redis(**self._redis_args)
         for key in redis_keys:
             value = r.get(key)
+            self.kv_pool[key]['value'] = value
+            self.kv_pool[key]['update_time'] = datetime.now().timestamp() * 1000
+            print('key:[%s], get value:[%s]' % (key, value))
+
+
+r_config = {
+    'host': '127.0.0.1',
+    'port': 6379,
+    'decode_responses': True,
+    'password': ''
+}
+try:
+    from myconfig import redis_config
+
+    r_config = redis_config
+except BaseException as e:
+    pass
+
+print(r_config)
+
+c = KeyValueGetter(r_config, {})
+c.register_key('foo', 'default foo')
+c.get_value('foo')
+c.query_redis()
+c.get_value('foo')
