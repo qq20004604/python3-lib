@@ -61,6 +61,7 @@ class MySQLTool(object):
     def run_sql(self, sql_list):
         # 依次执行 sql 语句
         for sql in sql_list:
+            print(sql)
             if len(sql) == 1:
                 self.cursor.execute(sql[0])
             else:
@@ -74,7 +75,7 @@ class MySQLTool(object):
             log(str(e))
         finally:
             if error:
-                return None
+                return False
             else:
                 return result
 
