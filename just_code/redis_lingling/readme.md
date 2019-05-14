@@ -4,5 +4,6 @@
 
 ```bash
 pip install redis
+pip install mysql-connector
 ```
 
