@@ -48,3 +48,27 @@ result = m.run_sql([
 print(result)
 m.close()
 ```
+
+示例3（同时插入多行数据）
+
+```mysql
+m2.insert_more_rows(
+        'INSERT INTO key_value (k, val, creator_id, user_id, status) values (%s, %s, %s, %s, %s)',
+        [
+            ('c', 'AAA', 1, '1', 0),
+            ('d', 'BBB', 1, '1', 0)
+        ]
+    )with MySQLTool(user=user, password=pw, database=database, host=host) as m2:
+    # 执行sql并获得返回结果
+    result2 = m2.insert_more_rows(
+        'INSERT INTO key_value (k, val, creator_id, user_id, status) values (%s, %s, %s, %s, %s)',
+        [
+            ('c', 'AAA', 1, '1', 0),
+            ('d', 'BBB', 1, '1', 0)
+        ]
+    )
+    if result2 is True:
+        print('success')
+    else:
+        print('error:[%s]' % result2)
+```

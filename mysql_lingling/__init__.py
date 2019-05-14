@@ -12,6 +12,11 @@ _port = 3306
 _unix_socket = None
 
 
+def log(msg):
+    with open('./log.log', 'wa')as f:
+        f.write(msg)
+
+
 class MySQLTool(object):
     def __init__(self, **args):
         self.c = None
@@ -64,13 +69,30 @@ class MySQLTool(object):
         try:
             # 这里如果报错，说明操作是比如 create table 之类的操作，返回 None
             result = self.cursor.fetchall()
-        except BaseException:
+        except BaseException as e:
             error = True
+            log(str(e))
         finally:
             if error:
                 return None
             else:
                 return result
+
+    # 同时插入多行，如果错误，会返回False
+    def insert_more_rows(self, sql, args):
+        error = False
+        msg = ''
+        try:
+            self.cursor.executemany(sql, args)
+        except BaseException as e:
+            error = True
+            msg = str(e)
+            log(msg)
+        finally:
+            if error:
+                return msg
+            else:
+                return True
 
     # 返回 cursor
     def get_cursor(self):
