@@ -13,8 +13,8 @@ _unix_socket = None
 
 
 def log(msg):
-    with open('./log.log', 'wa')as f:
-        f.write(msg)
+    with open('./log.log', 'a')as f:
+        f.write('%s\n' % msg)
 
 
 class MySQLTool(object):
@@ -59,30 +59,35 @@ class MySQLTool(object):
 
     # 执行 SQL 语句，并返回最后一次查询的查询结果
     def run_sql(self, sql_list):
-        # 依次执行 sql 语句
-        for sql in sql_list:
-            print(sql)
-            if len(sql) == 1:
-                self.cursor.execute(sql[0])
-            else:
-                self.cursor.execute(*sql)
         error = False
         try:
+            # 依次执行 sql 语句
+            for sql in sql_list:
+                print('sql: %s', sql)
+                if len(sql) == 1:
+                    self.cursor.execute(sql[0])
+                else:
+                    self.cursor.execute(*sql)
             # 这里如果报错，说明操作是比如 create table 之类的操作，返回 None
             result = self.cursor.fetchall()
         except BaseException as e:
+            print(e)
             error = True
             log(str(e))
         finally:
+            # 如果错误，返回False，其他时候返回结果
             if error:
                 return False
             else:
                 return result
 
-    # 同时插入多行，如果错误，会返回False
+    # 同时插入多行（也可以只插入一行），如果插入错误，会返回False
+    # 示例：m.insert_more_rows(
+    #             'insert person(name,age) values (%s, %s)',
+    #             [('六六六', 666)]
+    #         )
     def insert_more_rows(self, sql, args):
         error = False
-        msg = ''
         try:
             self.cursor.executemany(sql, args)
         except BaseException as e:
@@ -91,7 +96,7 @@ class MySQLTool(object):
             log(msg)
         finally:
             if error:
-                return msg
+                return False
             else:
                 return True
 
@@ -144,13 +149,13 @@ if __name__ == '__main__':
                   password=pw,
                   # host=ip,
                   database=database)
-        result = m.run_sql([
-            ['insert person(name,age) values (%s, %s)', ['六六六', 666]],
-            ['select * from person']
-        ])
+        result = m.insert_more_rows(
+            'insert person(name,age) values (%s, %s)',
+            [('六六六', 666)]
+        )
         print(result)
         m.close()
     except BaseException as e:
+        print(e)
         is_error = True
-
-    print_testresult(~is_error, 'MySQLTool')
+    print_testresult(not is_error, 'MySQLTool')
