@@ -81,6 +81,23 @@ class MySQLTool(object):
             else:
                 return result
 
+    # 插入一行
+    def insert_row(self, sql, args):
+        error = False
+        try:
+            # 正常情况下，返回值为None
+            result = self.cursor.execute(sql, args)
+            print(result)
+        except BaseException as e:
+            error = True
+            msg = str(e)
+            log(msg)
+        finally:
+            if error:
+                return False
+            else:
+                return self.get_last_insert_id()
+
     # 同时插入多行（也可以只插入一行），如果插入错误，会返回False
     # 示例：m.insert_more_rows(
     #             'insert person(name,age) values (%s, %s)',
@@ -89,6 +106,7 @@ class MySQLTool(object):
     def insert_more_rows(self, sql, args):
         error = False
         try:
+            # 正常情况下，返回值为None
             self.cursor.executemany(sql, args)
         except BaseException as e:
             error = True
@@ -98,16 +116,20 @@ class MySQLTool(object):
             if error:
                 return False
             else:
-                return True
+                return self.get_last_insert_id()
 
     # 返回 cursor
     def get_cursor(self):
         return self.cursor
 
-    # 当上一次操作是插入时，获取插入的行数
+    # 当上一次操作是插入时，获取插入的行数。比如插入一条就是一行
     # 如果是 -1，表示上一次操作不是插入
     def get_insert_rowcount(self):
         return self.cursor.rowcount
+
+    # 获取上一个插入行的id（需要要插入后执行才能正确返回id，否则返回None）
+    def get_last_insert_id(self):
+        return self.cursor.lastrowid
 
     # 手动提交事务，部分场景下可能有用
     def commit(self):
@@ -142,6 +164,7 @@ if __name__ == '__main__':
             # 打印结果
             print(result2)
 
+        print("——————————————————————")
         # ---- 测试代码1 ----
         m = MySQLTool()
         # 查看mysql容器内 ip，参考这个链接：https://blog.csdn.net/CSDN_duomaomao/article/details/75638544
@@ -153,7 +176,16 @@ if __name__ == '__main__':
             'insert person(name,age) values (%s, %s)',
             [('六六六', 666)]
         )
-        print(result)
+        if result is False:
+            is_error = True
+
+        result2 = m.insert_row(
+            'insert person(name,age) values (%s, %s)',
+            ('六六六', 666)
+        )
+        if result is False:
+            is_error = True
+
         m.close()
     except BaseException as e:
         print(e)
