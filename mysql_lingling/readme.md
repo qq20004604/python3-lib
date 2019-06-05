@@ -32,7 +32,7 @@ with MySQLTool(user=user, password=pw, database=database) as m2:
     print(result2)
 ```
 
-示例2（普通语法）
+示例2（普通语法，建议使用专有语法，这里是通用语法示例）
 
 ```
 m = MySQLTool()
@@ -61,8 +61,8 @@ with MySQLTool(user=user, password=pw, database=database, host=host) as m2:
 	        ('d', 'BBB', 1, '1', 0)
 	    ]
 	)
-	if result2 is True:
+	if result2 is not False:
 	    print('success')
 	else:
-	    print('error:[%s]' % result2)
+	    print('error!')
 ```

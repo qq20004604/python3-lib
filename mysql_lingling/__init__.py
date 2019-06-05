@@ -58,6 +58,8 @@ class MySQLTool(object):
             self.close()
 
     # 执行 SQL 语句，并返回最后一次查询的查询结果
+    # 如果错误，返回False，其他时候返回结果
+    # 适用于select时使用。建议insert和update使用专有函数
     def run_sql(self, sql_list):
         error = False
         try:
@@ -81,13 +83,37 @@ class MySQLTool(object):
             else:
                 return result
 
-    # 插入一行
+    # 更新专用函数。
+    # 错误返回False，未更新（比如说不需要更新）返回0，成功更新返回更新的行数
+    def update_row(self, sql, args):
+        error = False
+        change_rows = None
+        try:
+            self.cursor.execute(sql, args)
+            # 判断一下影响了多少条数据，如果为0条，说明啥事都没干
+            change_rows = self.get_cu_rowcount()
+        except BaseException as e:
+            print(e)
+            error = True
+            log(str(e))
+        finally:
+            # 如果错误，返回False，其他时候返回结果
+            if error:
+                return False
+            else:
+                return change_rows
+
+    # 插入一行。
+    # 插入失败（报错或无法插入）返回False，插入成功返回插入行的id
     def insert_row(self, sql, args):
         error = False
         try:
             # 正常情况下，返回值为None
-            result = self.cursor.execute(sql, args)
-            print(result)
+            self.cursor.execute(sql, args)
+            # 判断一下影响了多少条数据，如果为0条，说明啥事都没干
+            change_rows = self.get_cu_rowcount()
+            if change_rows == 0:
+                error = True
         except BaseException as e:
             error = True
             msg = str(e)
@@ -98,16 +124,23 @@ class MySQLTool(object):
             else:
                 return self.get_last_insert_id()
 
-    # 同时插入多行（也可以只插入一行），如果插入错误，会返回False
+    # 同时插入多行（也可以只插入一行）
+    # 如果插入错误/或未成功插入，会返回False
+    # 插入成功，则返回插入的条数
     # 示例：m.insert_more_rows(
     #             'insert person(name,age) values (%s, %s)',
     #             [('六六六', 666)]
     #         )
     def insert_more_rows(self, sql, args):
         error = False
+        change_rows = None
         try:
             # 正常情况下，返回值为None
             self.cursor.executemany(sql, args)
+            # 判断一下影响了多少条数据，如果为0条，说明啥事都没干
+            change_rows = self.get_cu_rowcount()
+            if change_rows == 0:
+                error = True
         except BaseException as e:
             error = True
             msg = str(e)
@@ -116,15 +149,15 @@ class MySQLTool(object):
             if error:
                 return False
             else:
-                return self.get_last_insert_id()
+                return change_rows
 
     # 返回 cursor
     def get_cursor(self):
         return self.cursor
 
-    # 当上一次操作是插入时，获取插入的行数。比如插入一条就是一行
+    # 当上一次操作是插入或更新时，获取插入/更新影响的行数。比如插入一条就是一行
     # 如果是 -1，表示上一次操作不是插入
-    def get_insert_rowcount(self):
+    def get_cu_rowcount(self):
         return self.cursor.rowcount
 
     # 获取上一个插入行的id（需要要插入后执行才能正确返回id，否则返回None）
