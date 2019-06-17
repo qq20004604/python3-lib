@@ -4,8 +4,13 @@
 import time
 import sys
 import smtplib
+import os
 from email.mime.text import MIMEText
 from email.header import Header
+
+# 创建目录
+if not os.path.exists('log'):
+    os.mkdir('log')
 
 
 def errlog(msg):
