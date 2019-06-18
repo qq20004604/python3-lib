@@ -111,7 +111,7 @@ if __name__ == '__main__':
         # 放大2倍
         img.img_scale_xy(2)
         # 判断目录是否存在
-        if not os.path.exists('test'):
+        if not os.path.isdir('test'):
             os.makedirs("test")
         # 保存图片(2倍原图大小 png）
         img.save_img('test/02.png')
@@ -142,7 +142,7 @@ if __name__ == '__main__':
         print_testresult((w1 == w * 2 and h1 == h * 2 and w2 == int(w * 0.25) and h2 == int(h * 0.25)), 'PIL_lingling')
 
         # 最后再删除文件和文件夹
-        if os.path.exists('test'):
+        if os.path.isdir('test'):
             # 递归删除文件和文件夹
             shutil.rmtree('test')
     except BaseException as e:

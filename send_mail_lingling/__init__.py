@@ -9,7 +9,7 @@ from email.mime.text import MIMEText
 from email.header import Header
 
 # 创建目录
-if not os.path.exists('log'):
+if not os.path.isdir('log'):
     os.mkdir('log')
 
 
