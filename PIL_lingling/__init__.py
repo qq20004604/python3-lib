@@ -71,6 +71,14 @@ class ImgTool(object):
     def blur_img(self):
         self.img = self.img.filter(ImageFilter.BLUR)
 
+    # 左右反转
+    def flip_left_right(self):
+        self.img = self.img.transpose(Image.FLIP_LEFT_RIGHT)
+
+    # 旋转
+    def rotate(self, deg):
+        self.img = self.img.rotate(deg)
+
     # --------------- 【3】图片逻辑(完) ---------------
 
     # --------------- 【4】图片状态获取 ---------------
@@ -101,6 +109,11 @@ class ImgTool(object):
 # 测试代码
 if __name__ == '__main__':
     try:
+        # 最后再删除文件和文件夹
+        if os.path.isdir('test'):
+            # 递归删除文件和文件夹
+            shutil.rmtree('test')
+
         img = ImgTool()
         # 读取图片
         img.open_image('01.png')
@@ -131,6 +144,16 @@ if __name__ == '__main__':
         img.blur_img()
         img.save_img('test/03.png')
 
+        # -- 左右反转 --
+        img.load_img_status()
+        img.flip_left_right()
+        img.save_img('test/04.png')
+
+        # -- 旋转（deg） --
+        img.load_img_status()
+        img.rotate(270)
+        img.save_img('test/05.png')
+
         # --- 下来开始测试 ---
         img_test = ImgTool('01.png')
         w, h = img_test.get_img_size()
@@ -140,11 +163,6 @@ if __name__ == '__main__':
         w2, h2 = img_test.get_img_size()
 
         print_testresult((w1 == w * 2 and h1 == h * 2 and w2 == int(w * 0.25) and h2 == int(h * 0.25)), 'PIL_lingling')
-
-        # 最后再删除文件和文件夹
-        if os.path.isdir('test'):
-            # 递归删除文件和文件夹
-            shutil.rmtree('test')
     except BaseException as e:
         print_testresult(False, 'PIL_lingling')
         print(e)
