@@ -198,10 +198,11 @@ def main():
         # 保存 Excel 工作簿到文件
         workbook.save("match.xlsx")
 
-        end_time = time.time()
-        elapsed_time = end_time - start_time
+    end_time = time.time()
+    elapsed_time = end_time - start_time
 
-        print(f"程序总共耗时 {elapsed_time:.4f} 秒")
+    logging.info(f"程序总共耗时 {elapsed_time:.4f} 秒")
+    print(f"程序总共耗时 {elapsed_time:.4f} 秒")
 
 
 if __name__ == '__main__':
