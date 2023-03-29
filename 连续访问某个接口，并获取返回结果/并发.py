@@ -3,7 +3,6 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import time
 import glob
-import os
 
 url = "http://127.0.0.1:7001/bbs/login"
 

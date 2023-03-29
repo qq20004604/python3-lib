@@ -1,0 +1,6 @@
+gitlab_api_access_token: '个人token，建议只给read权限和api权限，不要给write权限'
+group_id: 1     # gitlab的群组id
+api_to_search: '要搜索的字符串'
+gitlab_api_url: 'gitlab的地址'
+branch_limit: 1   # 查询的分支数（如果分支太多的时候就……增加他）
+test_mode: False #  测试模式，只查询第一个仓库的第一个分支
