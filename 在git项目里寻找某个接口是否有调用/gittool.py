@@ -143,7 +143,8 @@ class GitTool:
             # 正则匹配
             elif self.config['file_match']['type'] == "regexp":
                 for file in files:
-                    regex = re.compile()
+                    # 解析字符串为正则表达式
+                    regex = re.compile(self.config['file_match']['file_type'])
                     if len(regex.findall(file)) > 0:
                         js_file_path = os.path.relpath(os.path.join(root, file), local_repo_path)
                         js_files.append(js_file_path)
@@ -205,6 +206,120 @@ class GitTool:
         # 拉取返回结果
         result = json.loads(ctypes.string_at(c_result).decode('utf-8'))
         return result
+
+    # 群组模式
+    def _get_projects_by_model_group(self, do_projects_fn):
+        # 根据群组ID拿到所有项目
+        if self['type_group']['group_id'] is None:
+            self.err_logger.info("群组项目ID（type_group.group_id）为空")
+        group = self.gl.groups.get(self['type_group']['group_id'])
+        projects = group.projects.list(all=True)
+
+        # 添加本次任务执行时间
+        logging.info(f"本次任务执行时间: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+        # 测试模式下只遍历第一个仓库
+        if self.config['test_mode'] is True:
+            projects = projects[:1]
+
+        logging.info("本次处理的项目有：", projects)
+
+        # 遍历项目
+        for project in projects:
+            logging.info("==== 大分割线 ====")
+            logging.info(f"正在处理项目：{project.name}")
+            # 根据项目id获取项目仓库
+            repo = self.gl.projects.get(project.id)
+            # 再获取到所有分支
+            branches = repo.branches.list(get_all=True)
+
+            # 所有分支名
+            selected_branches = []
+
+            # 如果匹配模式是全部分支
+            if self.config['type_group']['branch_match_type'] == "all":
+                selected_branches = [branch.name for branch in branches]
+            elif self.config['type_group']['branch_match_type'] == "name_match":
+                all_branch_names = [branch.name for branch in branches]
+                for branch_name in all_branch_names:
+                    # 解析字符串
+                    branch_match_name = self.config['type_group']['branch_match_name']
+                    # 避免不写情况，不写则默认为所有
+                    if len(branch_match_name) == 0:
+                        err_msg = "错误：当 type_group.branch_match_type 为 name_match 时，type_group.branch_match_name 不能可为空。"
+                        print(err_msg)
+                        self.err_logger.info(err_msg)
+                        exit()
+
+                    regex = re.compile(branch_match_name)
+                    # 分支名进行匹配
+                    if len(regex.findall(branch_name)) > 0:
+                        # 匹配成功则添加
+                        selected_branches.append(branch_name)
+            elif self.config['type_group']['branch_match_type'] == "last_commit_time":
+                # 存储每个分支的最新提交时间和分支名称的元组
+                branch_commits = []
+                # 按最后提交时间进行匹配
+                # 遍历所有分支
+                for branch in branches:
+                    # 获取该分支的最新提交，限制只返回1个
+                    commit = repo.commits.list(ref_name=branch.name, per_page=1)[0]
+                    # 将最新提交时间和分支名称作为一个元组添加到branch_commits列表中
+                    branch_commits.append((commit.committed_date, branch.name))
+
+                # 按最近提交时间对分支进行排序，并提取排好序的分支名称。b[1] 指取 branch.name
+                selected_branches = [b[1] for b in sorted(branch_commits, reverse=True)]
+            else:
+                err_msg = "错误：当 model 为 group 时，未找到合法的 type_group.branch_match_type"
+                print(err_msg)
+                self.err_logger.info(err_msg)
+                exit()
+
+            # 此时拿到该项目下符合要求的分支，准备clone项目并进行处理
+            if self.config['type_group']['branch_limit'] != 'all':
+                if self.config['type_group']['branch_limit'] > 0:
+                    # 则限制指定数量的分支数
+                    selected_branches = selected_branches[:self.config['type_group']['branch_limit']]
+
+            for branch in selected_branches:
+                logging.info(f"----- 小分割线 -----")
+                logging.info(f"正在处理分支：{branch}")
+
+    # 单项目模式
+    def _get_projects_by_model_repository(self):
+        pass
+
+    # 多项目模式
+    def _get_projects_by_model_repositories(self):
+        pass
+
+    # 本地模式
+    def _get_projects_by_model_local(self):
+        pass
+
+    # todo 拿到项目的目录list，依次在文件列表里进行匹配
+
+    # 主执行程序
+    def run(self):
+        # 添加本次任务开始执行时间
+        logging.info(f"本次任务开始执行时间: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+        projects = []
+        # 1. 先根据模式，拉取
+        if self.config['model'] == 'group':
+            projects = self._get_projects_by_model_group()
+        elif self.config['model'] == 'repository':
+            pass
+        elif self.config['model'] == 'repositories':
+            pass
+        elif self.config['model'] == 'local':
+            pass
+        else:
+            err_msg = "未选择任何一个合法模式，请检查配置文件"
+            print(err_msg)
+            self.err_logger.info(err_msg)
+            exit()
+        print("处理的项目如下：", projects)
 
 
 if __name__ == '__main__':
