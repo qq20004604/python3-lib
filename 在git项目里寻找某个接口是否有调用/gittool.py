@@ -9,19 +9,18 @@ from openpyxl import Workbook
 from openpyxl import load_workbook
 from git import Repo
 import re
-
+import datetime
 import ctypes
 import json
 
 
 class GitTool:
     def __init__(self):
-        # 搜索字符串
-        self.search_string = None
         # 配置
         self.config = None
         # gitlab api的客户端
         self.gl = None
+        self.workbook = None
         # excel
         self.worksheet = None
         # 日志句柄
@@ -33,13 +32,12 @@ class GitTool:
     # 读取配置
     def read_config(self):
         # 读取配置文件
+        # with open('config_private.yml') as file:
         with open('config.yml') as file:
             config = yaml.safe_load(file)
 
         self.config = config
-        # 3. 设置查找的接口名称
-        self.search_string = self.config['api_to_search']
-        # 4. 设置 GitLab API 客户端
+        # 设置 GitLab API 客户端
         self.gl = gitlab.Gitlab(config['gitlab_api_url'], private_token=self.config['gitlab_api_access_token'])
 
         # 检查配置
@@ -52,31 +50,32 @@ class GitTool:
     # 删除历史文件
     def remove_oldfile(self):
         # 开始前先删除文件
-        files_to_delete = ['./match.log', './branch.log', './err.log', './match.xlsx']
+        files_to_delete = ['./log/match.log', './log/branch.log', './log/err.log', './log/output.log',
+                           './log/match.xlsx']
 
         for file in files_to_delete:
             if os.path.exists(file):
                 os.remove(file)
                 print(f"文件 {file} 已删除")
             else:
-                print(f"文件 {file} 不存在")
+                print(f"文件 {file} 不存在，无需清理")
 
     # 检查excel
     def open_excel(self):
         # 尝试打开 Excel 文件以检查是否可以读写
         try:
-            workbook = load_workbook(filename='match.xlsx')
-            self.worksheet = workbook.active
+            self.workbook = load_workbook(filename='./log/match.xlsx')
+            self.worksheet = self.workbook.active
             # 清空之前的内容
             for row in self.worksheet.iter_rows(min_row=2, min_col=1):
                 for cell in row:
                     cell.value = None
         except FileNotFoundError:
-            workbook = Workbook()
-            self.worksheet = workbook.active
+            self.workbook = Workbook()
+            self.worksheet = self.workbook.active
             self.worksheet.title = "匹配结果"
             self.worksheet.append(["仓库名", "分支名", "文件路径", "文件行数", "该行内容"])
-            self.worksheet = workbook.active
+            self.worksheet = self.workbook.active
         except IOError as e:
             logging.error(f"无法打开 Excel 文件：{e}")
             exit()
@@ -88,25 +87,30 @@ class GitTool:
 
     # 日志设置
     def set_log(self):
+        if not os.path.exists("log"):
+            os.mkdir("log")
+            print("日志目录已创建")
+        else:
+            print("日志目录已存在")
         # 配置 output.log 记录器
-        logging.basicConfig(filename='output.log', level=logging.INFO, format='%(message)s')
+        logging.basicConfig(filename='log/output.log', level=logging.INFO, format='%(message)s')
 
         # 创建一个新的日志记录器并配置 match.log
         self.match_logger = logging.getLogger('match')
-        match_handler = logging.FileHandler('match.log')
+        match_handler = logging.FileHandler('log/match.log')
         match_handler.setFormatter(logging.Formatter('%(message)s'))
         self.match_logger.addHandler(match_handler)
         self.match_logger.setLevel(logging.INFO)
 
         # 创建一个新的日志记录器并配置 branch.log
         self.branch_logger = logging.getLogger('branch')
-        branch_handler = logging.FileHandler('branch.log')
+        branch_handler = logging.FileHandler('log/branch.log')
         branch_handler.setFormatter(logging.Formatter('%(message)s'))
         self.branch_logger.addHandler(branch_handler)
         self.branch_logger.setLevel(logging.INFO)
 
         self.err_logger = logging.getLogger('err')
-        err_handler = logging.FileHandler('err.log')
+        err_handler = logging.FileHandler('log/err.log')
         err_handler.setFormatter(logging.Formatter('%(message)s'))
         self.err_logger.addHandler(err_handler)
         self.err_logger.setLevel(logging.INFO)
@@ -130,7 +134,7 @@ class GitTool:
             elif self.config['file_match']['type'] == "normal":
                 for file in files:
                     # 如果这些某个文件以这个为结尾
-                    if any(file in type for type in self.config['file_match']['file_type']):
+                    if any(type in file for type in self.config['file_match']['file_type']):
                         js_file_path = os.path.relpath(os.path.join(root, file), local_repo_path)
                         js_files.append(js_file_path)
             # 后缀名匹配
@@ -158,7 +162,7 @@ class GitTool:
     def search_string_in_file_by_python(self, file_path, search_string):
         res = {
             "MatchedLines": [],
-            "Error": "",
+            "Error": None,
         }
 
         try:
@@ -172,6 +176,7 @@ class GitTool:
                             "Line": line
                         }
                         res['MatchedLines'].append(item)
+                        # print("匹配成功", line)
         except FileNotFoundError:
             err = f"文件未找到：{file_path}"
             res['Error'] = err
@@ -185,6 +190,8 @@ class GitTool:
             res['Error'] = err
             print(err)
         finally:
+            # if len(res['MatchedLines']) > 0:
+            #     print(res)
             return res
 
     # 入参：文件路径，搜索字符串
@@ -208,11 +215,11 @@ class GitTool:
         return result
 
     # 群组模式
-    def _get_projects_by_model_group(self, do_projects_fn):
+    def _get_projects_by_model_group(self):
         # 根据群组ID拿到所有项目
-        if self['type_group']['group_id'] is None:
+        if self.config['type_group']['group_id'] is None:
             self.err_logger.info("群组项目ID（type_group.group_id）为空")
-        group = self.gl.groups.get(self['type_group']['group_id'])
+        group = self.gl.groups.get(self.config['type_group']['group_id'])
         projects = group.projects.list(all=True)
 
         # 添加本次任务执行时间
@@ -222,12 +229,14 @@ class GitTool:
         if self.config['test_mode'] is True:
             projects = projects[:1]
 
-        logging.info("本次处理的项目有：", projects)
+        # projects_name_log = [project.name for project in projects]
+        print("本次处理的项目有：", [project.name for project in projects])
 
         # 遍历项目
         for project in projects:
             logging.info("==== 大分割线 ====")
             logging.info(f"正在处理项目：{project.name}")
+            print(f"正在处理项目：{project.name}")
             # 根据项目id获取项目仓库
             repo = self.gl.projects.get(project.id)
             # 再获取到所有分支
@@ -238,8 +247,10 @@ class GitTool:
 
             # 如果匹配模式是全部分支
             if self.config['type_group']['branch_match_type'] == "all":
+                print("当前寻找分支模式是：全部分支")
                 selected_branches = [branch.name for branch in branches]
             elif self.config['type_group']['branch_match_type'] == "name_match":
+                print("当前寻找分支模式是：名称匹配")
                 all_branch_names = [branch.name for branch in branches]
                 for branch_name in all_branch_names:
                     # 解析字符串
@@ -257,18 +268,32 @@ class GitTool:
                         # 匹配成功则添加
                         selected_branches.append(branch_name)
             elif self.config['type_group']['branch_match_type'] == "last_commit_time":
+                # 计算15天前的日期
+                commit_since_before = self.config['type_group']['commit_since_before'] or 15
+                print(f"当前寻找分支模式是：按最后提交时间。时间限制为最近{commit_since_before}提交过的分支")
                 # 存储每个分支的最新提交时间和分支名称的元组
                 branch_commits = []
                 # 按最后提交时间进行匹配
                 # 遍历所有分支
                 for branch in branches:
+                    # print(f"正在获取分支：{branch.name} 的最新提交")
+                    delta = datetime.timedelta(days=commit_since_before)
+                    start_date = datetime.datetime.now() - delta
+                    # 使用15天前的日期和当前日期作为日期范围
+                    end_date = datetime.datetime.now()
                     # 获取该分支的最新提交，限制只返回1个
-                    commit = repo.commits.list(ref_name=branch.name, per_page=1)[0]
+                    commit_list = repo.commits.list(ref_name=branch.name, since=start_date, until=end_date)
+                    # print(f"总计有 {len(commit_list)} 个提交")
+                    if len(commit_list) == 0:
+                        print(f"分支：{branch.name} 最近{commit_since_before}天，无提交，跳过")
+                        continue
+                    commit = commit_list[0]
                     # 将最新提交时间和分支名称作为一个元组添加到branch_commits列表中
                     branch_commits.append((commit.committed_date, branch.name))
 
                 # 按最近提交时间对分支进行排序，并提取排好序的分支名称。b[1] 指取 branch.name
                 selected_branches = [b[1] for b in sorted(branch_commits, reverse=True)]
+                print(f"所有分支排序后为：{selected_branches}")
             else:
                 err_msg = "错误：当 model 为 group 时，未找到合法的 type_group.branch_match_type"
                 print(err_msg)
@@ -278,12 +303,81 @@ class GitTool:
             # 此时拿到该项目下符合要求的分支，准备clone项目并进行处理
             if self.config['type_group']['branch_limit'] != 'all':
                 if self.config['type_group']['branch_limit'] > 0:
+                    print("目前限定处理分支数量是：", self.config['type_group']['branch_limit'])
                     # 则限制指定数量的分支数
                     selected_branches = selected_branches[:self.config['type_group']['branch_limit']]
 
             for branch in selected_branches:
                 logging.info(f"----- 小分割线 -----")
                 logging.info(f"正在处理分支：{branch}")
+                print(f"正在处理分支：{branch}")
+
+                # 检查目录是否存在，如果存在则删除
+                local_repo_path = f"{project.name}-{branch}"
+                local_repo_pathlib = pathlib.Path(local_repo_path)
+                if local_repo_pathlib.exists():
+                    shutil.rmtree(local_repo_path, ignore_errors=True)
+
+                # 克隆仓库到本地临时目录
+                local_repo_path = f"{project.name}-{branch}"
+                Repo.clone_from(repo.http_url_to_repo, local_repo_path, branch=branch)
+                print(f"已克隆到本地：{local_repo_path}")
+
+                try:
+                    print("开始获取所有匹配的文件")
+                    # 从本地仓库获取文件列表
+                    js_files = self.find_files_by_match_name(local_repo_path)
+
+                    # 添加分支信息到 branch.log
+                    local_repo = Repo(local_repo_path)
+                    branch_commit = local_repo.commit(branch)
+                    commit_time = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(branch_commit.committed_date))
+                    branch_info = f"{repo.name}-{branch}-{branch_commit.hexsha}-{commit_time}-{branch_commit.author}"
+                    self.branch_logger.info(branch_info)
+
+                    print("开始遍历所有文件进行查询")
+                    # 遍历所有匹配的文件
+                    for js_file_path in js_files:
+                        logging.info(f"正在处理文件：{os.path.abspath(os.path.join(local_repo_path, js_file_path))}")
+                        print(f"正在处理文件：{os.path.abspath(os.path.join(local_repo_path, js_file_path))}")
+                        # if os.path.abspath(os.path.join(local_repo_path,
+                        #                                 js_file_path)) == "/Users/wangdong/githubProject/python3-lib/在git项目里寻找某个接口是否有调用/Special Transaction Center-CZP-TIP-864/src/api/maqian.js":
+                        #     print("debug")
+                        if self.config['file_search_engine'] == "python":
+                            # 使用 python 来查询文件
+                            search_result = self.search_string_in_file_by_python(
+                                os.path.join(local_repo_path, js_file_path),
+                                self.config['string_to_search'])
+                        else:
+                            search_result = self.search_string_in_file_by_go(
+                                os.path.join(local_repo_path, js_file_path),
+                                self.config['string_to_search'])
+
+                        if search_result['Error'] is not None:
+                            # 如果有报错信息，说明在查找该文件的时候出问题了
+                            self.err_logger.info(search_result['Error'])
+                        else:
+                            # 此时正常，拿到匹配的行数
+                            matched_lines = search_result['MatchedLines']
+
+                            # 长度 > 0 ，说明有匹配的代码
+                            if len(matched_lines) > 0:
+                                for matched_line in matched_lines:
+                                    match_info = f"{repo.name}-{branch}-{js_file_path}-{matched_line['LineNumber']}-{matched_line['Line'].strip()}"
+                                    logging.info(match_info)
+                                    # 写入 match.log
+                                    self.match_logger.info(match_info)
+
+                                    # 将匹配结果添加到 Excel 工作表
+                                    self.worksheet.append([repo.name, branch, js_file_path, matched_line['LineNumber'],
+                                                           matched_line['Line'].strip()])
+
+
+                except Exception as e:
+                    self.err_logger.error(f"项目：{project.name}，处理分支 {branch} 时出错：{e}")
+                finally:
+                    # 删除本地仓库临时目录
+                    shutil.rmtree(local_repo_path, ignore_errors=True)
 
     # 单项目模式
     def _get_projects_by_model_repository(self):
@@ -304,7 +398,6 @@ class GitTool:
         # 添加本次任务开始执行时间
         logging.info(f"本次任务开始执行时间: {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-        projects = []
         # 1. 先根据模式，拉取
         if self.config['model'] == 'group':
             projects = self._get_projects_by_model_group()
@@ -319,48 +412,52 @@ class GitTool:
             print(err_msg)
             self.err_logger.info(err_msg)
             exit()
-        print("处理的项目如下：", projects)
+        self.workbook.save('./log/match.xlsx')
+        print("处理完毕")
 
 
 if __name__ == '__main__':
     gt = GitTool()
-    # # 设置日志
-    # gt.set_log()
-    # # 读取配置
-    # gt.read_config()
-    # # 删除历史文件
-    # gt.remove_oldfile()
-    # # 启动 excel
-    # gt.open_excel()
+    # 删除历史文件
+    gt.remove_oldfile()
+    # 设置日志
+    gt.set_log()
+    # 启动 excel
+    gt.open_excel()
+    # 读取配置
+    gt.read_config()
+    # 启动程序
+    gt.run()
+
     # with open('config.yml', 'r') as file:
     #     data = yaml.safe_load(file)
     #     print(data['file_type'])
-
-    start_time = time.time()
-
-    file_path = "./output.log"
-    search_string = "approvalComments/"
-
-    # hello_lib = ctypes.CDLL(os.path.abspath("./lib/hello.so"))
-    # hello_lib.Hello.argtypes = [ctypes.c_char_p]
-    # hello_lib.Hello.restype = None
-    # name = "John Doe"
-    # hello_lib.Hello(name.encode('utf-8'))
     #
-    # search_lib = ctypes.CDLL(os.path.abspath("./lib/search.so"))
-    # search_lib.searchStringInFileWrapper.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
-    # search_lib.searchStringInFileWrapper.restype = ctypes.c_char_p
+    # start_time = time.time()
     #
-    file_path = './output.log'
-    search_string = 'approvalComments'
-    result = gt.search_string_in_file_by_python(file_path, search_string)
-
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-
-    print(f"程序总共耗时 {elapsed_time:.4f} 秒")
-    print(result)
-    print(gt.search_string_in_file_by_go(file_path, search_string))
+    # file_path = "./output.log"
+    # search_string = "approvalComments/"
+    #
+    # # hello_lib = ctypes.CDLL(os.path.abspath("./lib/hello.so"))
+    # # hello_lib.Hello.argtypes = [ctypes.c_char_p]
+    # # hello_lib.Hello.restype = None
+    # # name = "John Doe"
+    # # hello_lib.Hello(name.encode('utf-8'))
+    # #
+    # # search_lib = ctypes.CDLL(os.path.abspath("./lib/search.so"))
+    # # search_lib.searchStringInFileWrapper.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+    # # search_lib.searchStringInFileWrapper.restype = ctypes.c_char_p
+    # #
+    # file_path = './output.log'
+    # search_string = 'approvalComments'
+    # result = gt.search_string_in_file_by_python(file_path, search_string)
+    #
+    # end_time = time.time()
+    # elapsed_time = end_time - start_time
+    #
+    # print(f"程序总共耗时 {elapsed_time:.4f} 秒")
+    # print(result)
+    # print(gt.search_string_in_file_by_go(file_path, search_string))
     # print(result['Error'])
     # if result.get('Error'):
     #     print(result['Error'])
